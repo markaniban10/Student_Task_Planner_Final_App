@@ -1,7 +1,13 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { makeTaskId } from './helpers';
+import {
+  cancelTaskReminders,
+  scheduleTaskReminders,
+  setupNotifications,
+  useFinishFromNotification,
+} from './notifications';
 
 // Context API: one shared place for the tasks, so every screen can use them
 // without passing props through many components.
@@ -50,6 +56,35 @@ export function TasksProvider({ children }) {
     });
   }, [tasks, isLoaded]);
 
+  // Ask for notification permission once, when the app starts
+  useEffect(() => {
+    setupNotifications();
+  }, []);
+
+  // Keep the reminders in sync with the tasks.
+  // We remember a "signature" of every task. When a task is new or its
+  // title, subject, deadline or done-status changed, we schedule it again.
+  // When a task was removed, we cancel its reminders.
+  const reminderSignatures = useRef({});
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const previous = reminderSignatures.current;
+    const next = {};
+
+    tasks.forEach((task) => {
+      const signature = `${task.title}|${task.subject}|${task.deadline}|${task.done}`;
+      next[task.id] = signature;
+      if (previous[task.id] !== signature) scheduleTaskReminders(task);
+    });
+
+    Object.keys(previous).forEach((id) => {
+      if (!(id in next)) cancelTaskReminders(id);
+    });
+
+    reminderSignatures.current = next;
+  }, [tasks, isLoaded]);
+
   // CREATE: add a new task at the top of the list
   const addTask = useCallback(({ title, subject, deadline }) => {
     const newTask = {
@@ -78,6 +113,19 @@ export function TasksProvider({ children }) {
       })
     );
   }, []);
+
+  // UPDATE: mark a task as finished (used by the Finish button on a notification).
+  // Unlike toggleTask, it never un-finishes a task.
+  const finishTask = useCallback((id) => {
+    setTasks((oldTasks) =>
+      oldTasks.map((t) =>
+        t.id === id && !t.done ? { ...t, done: true, completedAt: new Date().toISOString() } : t
+      )
+    );
+  }, []);
+
+  // When the user taps Finish on a notification, finish that task
+  useFinishFromNotification(isLoaded, finishTask);
 
   // DELETE: remove one task for good
   const deleteTask = useCallback((id) => {
