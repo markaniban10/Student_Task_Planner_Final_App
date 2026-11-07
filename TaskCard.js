@@ -1,6 +1,5 @@
-import React from 'react';
-import { Pressable, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Pressable, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from './ThemeContext';
 import { formatDeadline } from './helpers';
 
@@ -9,8 +8,10 @@ import { formatDeadline } from './helpers';
 //  - Tap the card  -> onPress (open the Edit screen)
 //  - Hold the card -> onLongPress (Edit / Delete menu)
 //  - onDelete is optional: when given, a trash icon is shown (History screen)
-export default function TaskCard({ task, now, onToggle, onPress, onLongPress, onDelete }) {
+//  - checked is optional: shows the checkmark before the task is really finished
+export default function TaskCard({ task, now, onToggle, onPress, onLongPress, onDelete, checked }) {
   const { colors, styles } = useTheme();
+  const showCheck = task.done || checked;
   const isOverdue = !task.done && task.deadline && new Date(task.deadline) < now;
 
   const dueText = task.done
@@ -25,9 +26,9 @@ export default function TaskCard({ task, now, onToggle, onPress, onLongPress, on
         accessibilityLabel={task.done ? 'Mark as not done' : 'Mark as done'}
       >
         <Ionicons
-          name={task.done ? 'checkbox' : 'square-outline'}
+          name={showCheck ? 'checkbox' : 'square-outline'}
           size={34}
-          color={task.done ? colors.textSoft : colors.text}
+          color={showCheck ? colors.textSoft : colors.text}
         />
       </TouchableOpacity>
 
