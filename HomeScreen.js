@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, SectionList, Text, TextInput, TouchableOpacity } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, SectionList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from './ThemeContext';
@@ -20,6 +20,10 @@ export default function HomeScreen({ navigation }) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [now, setNow] = useState(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pendingIds, setPendingIds] = useState([]); // tasks showing a checkmark
+  const [undoId, setUndoId] = useState(null);       // task that can be undone
+  const undoTimer = useRef(null);
 
   // Lifecycle: update the clock every minute so "Overdue" and "Today" stay
   // correct. The returned function (cleanup) stops the timer when the
@@ -55,9 +59,35 @@ export default function HomeScreen({ navigation }) {
     return SECTION_ORDER.filter((name) => groups[name]).map((name) => ({ title: name, data: groups[name] }));
   }, [tasks, selectedSubject, searchText, sortOrder, now]);
 
+
+const onRefresh = () => {
+  setIsRefreshing(true);
+  setNow(new Date());
+  setTimeout(() => setIsRefreshing(false), 600);
+};
+
   const closeSearch = () => {
     setIsSearching(false);
     setSearchText('');
+  };
+
+  //Tap the box: show the checkmark first, finish the task after 0.35 seconds
+  const completeTask = (id) => {
+    if (pendingIds.includes(id)) return;
+    setPendingIds((ids) => [...ids, id]); // checkmark appears now
+    setTimeout(() => {
+      toggleTask(id); // really finish it
+      setPendingIds((ids) => ids.filter((x) => x !== id));
+      setUndoId(id);
+      clearTimeout(undoTimer.current);
+      undoTimer.current = setTimeout(() => setUndoId(null), 4000);
+    }, 350);
+  };
+
+  // Undo: bring the last finished task back
+  const undoComplete = () => {
+    toggleTask(undoId);
+    setUndoId(null);
   };
 
   // Hold a task: choose Edit or Delete
@@ -107,6 +137,9 @@ export default function HomeScreen({ navigation }) {
       {!isLoading && !error && (
         <SectionList
           sections={sections}
+          extraData={pendingIds}
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
           keyExtractor={(item) => item.id}
           stickySectionHeadersEnabled={false}
           keyboardShouldPersistTaps="handled"
@@ -119,8 +152,9 @@ export default function HomeScreen({ navigation }) {
           renderItem={({ item }) => (
             <TaskCard
               task={item}
+              checked={pendingIds.includes(item.id)}
               now={now}
-              onToggle={() => toggleTask(item.id)}
+              onToggle={() => completeTask(item.id)}
               onPress={() => navigation.navigate('AddTask', { taskId: item.id })}
               onLongPress={() => openTaskMenu(item)}
             />
@@ -135,6 +169,28 @@ export default function HomeScreen({ navigation }) {
             />
           }
         />
+      )}
+
+      {/* Undo bar: shows after a task is finished */}
+      {undoId !== null && (
+        <View
+          style={{
+            position: 'absolute',
+            left: 16,
+            right: 16,
+            bottom: 110,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            padding: 16,
+            borderRadius: 8,
+            backgroundColor: '#E0E3E8',
+          }}
+        >
+          <Text style={{ color: '#333' }}>Task Finished</Text>
+          <TouchableOpacity onPress={undoComplete}>
+            <Text style={{ color: '#0077C0', fontWeight: 'bold' }}>Undo</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* + button: opens the Add Task screen */}
