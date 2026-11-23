@@ -25,13 +25,37 @@ export default function HomeScreen({ navigation }) {
   const [undoId, setUndoId] = useState(null);       // task that can be undone
   const undoTimer = useRef(null);
 
-  // Lifecycle: update the clock every minute so "Overdue" and "Today" stay
-  // correct. The returned function (cleanup) stops the timer when the
-  // screen is removed.
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
+  
+// Keeps the "Overdue" and "Today" groups correct while the app is open.
+// It updates `now` at the START of every minute (10:00:00, 10:01:00, ...).
+useEffect(() => {
+  // `timer` holds the id (a number) of the next scheduled tick.
+  // We use `let` because it gets a new value every time a tick runs.
+  let timer;
+
+  // One "tick": update the clock, then schedule the next tick.
+  const tick = () => {
+    // 1. Save the current time. This redraws the screen, and the
+    //    groups are calculated again with the new time.
+    setNow(new Date());
+
+    // 2. Work out how long to wait until the start of the next minute.
+    //    Date.now() % 60000 = milliseconds that already passed in this minute.
+    //    60000 - that = milliseconds left until the next minute starts.
+    //    + 500 = a small buffer so we land just AFTER the minute changes.
+    const msToNextMinute = 60000 - (Date.now() % 60000) + 500;
+
+    // 3. Run tick again after that wait, and remember the timer id.
+    timer = setTimeout(tick, msToNextMinute);
+  };
+
+  // Run the first tick right away when the screen appears.
+  tick();
+
+  // Cleanup: when the screen is removed, cancel the next scheduled tick
+  // so nothing keeps running in the background.
+  return () => clearTimeout(timer);
+}, []); // empty list = this effect is set up only once
 
   // Filter the unfinished tasks, sort them, then group them (Overdue, Today, ...)
   const sections = useMemo(() => {
