@@ -2,9 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useMemo } from 'react';
+import * as SystemUI from 'expo-system-ui';
+import { useEffect, useMemo } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 
 import AddTaskScreen from './AddTaskScreen';
 import { DrawerProvider, navigationRef } from './DrawerContext';
@@ -26,6 +28,7 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false, // our screens draw their own header
+        sceneStyle: { backgroundColor: colors.background },
         tabBarActiveTintColor: colors.tabActive,
         tabBarInactiveTintColor: colors.tabInactive,
         tabBarStyle: { backgroundColor: colors.tabBar, borderTopColor: colors.border },
@@ -47,6 +50,11 @@ function MainTabs() {
 // Everything that needs the theme colors lives here
 function AppContent() {
   const { colors, isDark } = useTheme();
+
+  // Paint the window behind the screens, so no white shows during transitions
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(colors.background);
+  }, [colors.background]);
 
   // Colors for the navigation container (rebuilt only when the theme changes)
   const navigationTheme = useMemo(
@@ -76,7 +84,10 @@ function AppContent() {
     <>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <NavigationContainer ref={navigationRef} theme={navigationTheme}>
-        <Stack.Navigator initialRouteName="Main">
+        <Stack.Navigator
+          initialRouteName="Main"
+          screenOptions={{ contentStyle: { backgroundColor: colors.background } }}
+        >
           <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
           <Stack.Screen
             name="AddTask"
